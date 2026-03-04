@@ -1,0 +1,116 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String    @id @default(uuid())
+  email     String    @unique
+  password  String
+  fullName  String?
+  phone     String?
+  role      String    @default("client")
+  createdAt DateTime  @default(now())
+  Profile   ClientProfile?
+  Ads       Ad[]
+  Reviews   Review[] // Relación con las reseñas que ha escrito el usuario
+}
+
+model ClientProfile {
+  id           String @id
+  restaurant   String
+  logoUrl      String?
+  bankAccount  String?
+  user         User   @relation(fields: [id], references: [id])
+}
+
+model City {
+  id    Int    @id @default(autoincrement())
+  name  String @unique
+  lat   Float?
+  lng   Float?
+  Ads   Ad[]
+}
+
+model FoodType {
+  id   Int    @id @default(autoincrement())
+  slug String @unique
+  name String
+  Ads  Ad[]
+}
+
+model Category {
+  id             Int    @id @default(autoincrement())
+  code           String @unique
+  name           String
+  visibilityRank Int
+  price          Float
+  durationDays   Int
+  Ads            Ad[]
+}
+
+model Ad {
+  id              String    @id @default(uuid())
+  clientId        String?
+  title           String
+  description     String
+  foodTypeId      Int?
+  cityId          Int?
+  categoryId      Int?
+  price           Float?
+  priceOffer      Float?
+  discountPercent Float?
+  imageUrl        String?
+  logoUrl         String?
+  hashtags        String[]
+  whatsapp        String?
+  likes           Int       @default(0)
+  isActive        Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+  startsAt        DateTime?
+  endsAt          DateTime?
+  paid            Boolean   @default(false)
+  paymentRef      String?
+  
+  // Nuevos campos para calificaciones
+  averageRating   Float     @default(0)
+  reviewCount     Int       @default(0)
+
+  client          User?     @relation(fields: [clientId], references: [id])
+  FoodType        FoodType? @relation(fields: [foodTypeId], references: [id])
+  City            City?     @relation(fields: [cityId], references: [id])
+  Category        Category? @relation(fields: [categoryId], references: [id])
+  Payments        Payment[]
+  Reviews         Review[]  // Relación con las reseñas del anuncio
+}
+
+model Payment {
+  id              String   @id @default(uuid())
+  adId            String
+  amount          Float
+  currency        String
+  stripePaymentId String   @unique
+  status          String
+  createdAt       DateTime @default(now())
+  ad              Ad       @relation(fields: [adId], references: [id])
+}
+
+// Nuevo modelo para las reseñas
+model Review {
+  id        String    @id @default(uuid())
+  rating    Int       // Calificación de 1 a 5
+  comment   String?   // Comentario opcional
+  createdAt DateTime  @default(now())
+
+  adId      String
+  userId    String
+  
+  ad        Ad        @relation(fields: [adId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([adId, userId]) // Un usuario solo puede dejar una reseña por anuncio
+}

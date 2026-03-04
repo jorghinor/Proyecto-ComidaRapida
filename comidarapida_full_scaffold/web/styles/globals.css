@@ -1,0 +1,47 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definición de la animación de movimiento */
+@keyframes move-left-right {
+  0%, 100% {
+    transform: translateX(-10%);
+  }
+  50% {
+    transform: translateX(10%);
+  }
+}
+
+/* Clase de utilidad para aplicar la animación */
+.animate-move-left-right {
+  animation: move-left-right 3s ease-in-out infinite;
+}
+
+/* --- Nuevos Estilos Globales para el Fondo --- */
+
+body {
+  background-color: #E0F7FA; /* Un tono de celeste claro */
+  position: relative; /* Necesario para posicionar el pseudo-elemento */
+  z-index: 0; /* Asegura que el body sea un contexto de apilamiento */
+}
+
+body::before {
+  content: "";
+  position: fixed; /* Fijo para que no se desplace con el scroll */
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-image: url('/icons/comida.png');
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain; /* Ajusta la imagen para que sea visible completamente */
+  opacity: 0.1; /* Opacidad baja para el efecto de marca de agua */
+  z-index: -1; /* Se posiciona detrás de todo el contenido del body */
+}
+
+/* --- Nuevos Estilos para Títulos --- */
+h1, h2, h3, h4, h5, h6 {
+  color: #E91E63; /* Guindo Fosforescente (Rojo-Rosado Vibrante) */
+  text-shadow: 1px 1px 3px #39FF14; /* Sombreado Verde Fosforescente */
+}

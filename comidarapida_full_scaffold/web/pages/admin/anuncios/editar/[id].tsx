@@ -1,0 +1,201 @@
+import { getSession } from 'next-auth/react';
+import { GetServerSideProps } from 'next';
+import { useState, ChangeEvent, useEffect } from 'react';
+import { useRouter } = 'next/router';
+import axios from 'axios';
+import useSWR from 'swr';
+import Head from 'next/head';
+import Header from '../../../components/Header'; // Importar el Header
+
+// Usar la URL del backend directamente
+const backendApiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+
+interface FoodType { id: number; name: string; }
+interface Category { id: number; name: string; price: number; durationDays: number; }
+interface City { id: number; name: string; }
+
+const fetcher = (url: string, token: string) => axios.get(url, { headers: { Authorization: `Bearer ${token}` } }).then(res => res.data);
+
+export default function EditarAnuncioPage({ token }: { token: string }) {
+  const router = useRouter();
+  const { id } = router.query;
+
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [price, setPrice] = useState('');
+  const [priceOffer, setPriceOffer] = useState('');
+  const [image, setImage] = useState<File | null>(null);
+  const [foodTypeId, setFoodTypeId] = useState<string>('');
+  const [categoryId, setCategoryId] = useState<string>('');
+  const [cityId, setCityId] = useState<string>('');
+  const [foodTypes, setFoodTypes] = useState<FoodType[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [cities, setCities] = useState<City[]>([]);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [currentImageUrl, setCurrentImageUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // Llamar directamente al backend
+        const [foodTypesRes, categoriesRes, citiesRes] = await Promise.all([
+          axios.get(`${backendApiUrl}/food-types`),
+          axios.get(`${backendApiUrl}/categories`),
+          axios.get(`${backendApiUrl}/cities`),
+        ]);
+        setFoodTypes(foodTypesRes.data);
+        setCategories(categoriesRes.data);
+        setCities(citiesRes.data);
+      } catch (err) {
+        console.error('Error al cargar datos:', err);
+        setError('No se pudieron cargar los datos necesarios.');
+      }
+    };
+    fetchData();
+  }, []);
+
+  // Llamar directamente al backend
+  const { data: adData, error: adError } = useSWR(
+    id && token ? [`${backendApiUrl}/ads/${id}`, token] : null,
+    ([url, token]) => fetcher(url, token)
+  );
+
+  useEffect(() => {
+    if (adData) {
+      setTitle(adData.title);
+      setDescription(adData.description);
+      setPrice(String(adData.price));
+      setPriceOffer(String(adData.priceOffer));
+      setFoodTypeId(String(adData.foodTypeId));
+      setCategoryId(String(adData.categoryId));
+      setCityId(String(adData.cityId));
+      setCurrentImageUrl(adData.imageUrl);
+    }
+  }, [adData]);
+
+  const handleImageChange = (e: ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setImage(e.target.files[0]);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    if (!foodTypeId || !categoryId || !cityId) {
+      setError('Por favor, selecciona un tipo de comida, una categoría y una ciudad.');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const session = await getSession();
+      if (!session || !session.accessToken) throw new Error('No has iniciado sesión o el token no está disponible.');
+
+      const formData = new FormData();
+      formData.append('title', title);
+      formData.append('description', description);
+      formData.append('price', price);
+      formData.append('priceOffer', priceOffer);
+      formData.append('foodTypeId', foodTypeId);
+      formData.append('categoryId', categoryId);
+      formData.append('cityId', cityId);
+      if (image) {
+        formData.append('image', image);
+      }
+
+      const config = {
+        headers: {
+          'Authorization': `Bearer ${session.accessToken}`,
+          'Content-Type': 'multipart/form-data',
+        },
+      };
+
+      // Llamar directamente al backend
+      const response = await axios.put(`${backendApiUrl}/ads/${id}`, formData, config);
+
+      if (response.status === 200) {
+        alert('¡Anuncio actualizado con éxito!');
+        router.push('/');
+      }
+    } catch (err: any) {
+      console.error('Error al actualizar el anuncio:', err);
+      setError(err.response?.data?.error || 'Ocurrió un error al actualizar el anuncio.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (adError) return <div>Error al cargar el anuncio para editar.</div>;
+  if (!adData && id) return <div>Cargando anuncio...</div>;
+
+  return (
+    <div className="min-h-screen flex flex-col">
+      <Head>
+        <title>ComidaRapida - Editar Anuncio</title>
+      </Head>
+      <Header />
+
+      <main className="flex-grow container mx-auto px-4 py-8">
+        <div className="max-w-2xl mx-auto bg-white p-8 rounded-lg shadow-md">
+          <h1 className="text-2xl font-bold mb-6 text-center">Editar Anuncio</h1>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div>
+              <label htmlFor="title" className="block text-sm font-medium text-gray-700">Título del Anuncio</label>
+              <input type="text" id="title" value={title} onChange={(e) => setTitle(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" />
+            </div>
+            <div>
+              <label htmlFor="description" className="block text-sm font-medium text-gray-700">Descripción</label>
+              <textarea id="description" value={description} onChange={(e) => setDescription(e.target.value)} required rows={4} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label htmlFor="price" className="block text-sm font-medium text-gray-700">Precio Regular ($)</label>
+                <input type="number" id="price" value={price} onChange={(e) => setPrice(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" />
+              </div>
+              <div>
+                <label htmlFor="priceOffer" className="block text-sm font-medium text-gray-700">Precio de Oferta ($)</label>
+                <input type="number" id="priceOffer" value={priceOffer} onChange={(e) => setPriceOffer(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" />
+              </div>
+            </div>
+            <div>
+              <label htmlFor="foodType" className="block text-sm font-medium text-gray-700">Tipo de Comida</label>
+              <select id="foodType" value={foodTypeId} onChange={(e) => setFoodTypeId(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                {foodTypes.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="category" className="block text-sm font-medium text-gray-700">Categoría del Anuncio</label>
+              <select id="category" value={categoryId} onChange={(e) => setCategoryId(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                {categories.map((cat) => <option key={cat.id} value={cat.id}>{cat.name} (Precio: ${cat.price}, Duración: {cat.durationDays} días)</option>)}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="city" className="block text-sm font-medium text-gray-700">Ciudad</label>
+              <select id="city" value={cityId} onChange={(e) => setCityId(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                {cities.map((city) => <option key={city.id} value={city.id}>{city.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Imagen del Anuncio</label>
+              {currentImageUrl && <img src={currentImageUrl} alt="Imagen actual" className="mt-2 mb-2 rounded-md" style={{ maxWidth: '150px' }} />}
+              <input type="file" id="image" accept="image/*" onChange={handleImageChange} className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"/>
+              <p className="text-xs text-gray-500 mt-1">Deja vacío para mantener la imagen actual.</p>
+            </div>
+            <button type="submit" disabled={loading} className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-gray-400">
+              {loading ? 'Actualizando...' : 'Actualizar Anuncio'}
+            </button>
+            {error && <p className="text-red-500 text-center">{error}</p>}
+          </form>
+        </div>
+      </main>
+
+      <footer className="bg-gray-800 text-white py-4 px-6 text-center">
+        <p>&copy; {new Date().getFullYear()} ComidaRapida. Todos los derechos reservados.</p>
+      </footer>
+    </div>
+  );
+}
